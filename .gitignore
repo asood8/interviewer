@@ -1,0 +1,10 @@
+# Personal data: profile, recordings, history
+data/
+
+# Secrets
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc

@@ -36,7 +36,7 @@ Pick a session mode ──► Claude asks a question ──► I answer out loud
 |---|---|---|
 | Language | Python | |
 | GUI | **Streamlit** | Fast to build, runs in the browser, has a built-in mic recorder (`st.audio_input`). No frontend code needed. |
-| LLM | Claude API (`anthropic` SDK) | Opus 5 for evaluation and feedback, Sonnet 5 for generating questions (cheaper, faster). |
+| LLM | Claude API (`anthropic` SDK) | Opus 5 for everything. Question generation runs at lower effort to keep it fast. The model can be changed with `INTERVIEWER_MODEL`. |
 | Speech-to-text | **faster-whisper** (runs locally) | Free and private, and it gives word timestamps, which we need to measure pace and pauses. The Claude API doesn't accept audio directly. |
 | Text-to-speech (optional) | `edge-tts` or `pyttsx3` | Reads the question out loud so it feels like a real interview. |
 | Storage | JSON files + SQLite in `data/` | Simple. The `data/` folder is gitignored because it holds personal info. |
@@ -219,6 +219,6 @@ interviewer/
 
 - **Privacy:** because the repo will be public, `data/`, `.env`, and recordings must be in `.gitignore` from the first commit.
 - **Cost:** mark the profile and dossiers as cached in each prompt (prompt caching) so the same large context
-  isn't billed at full price every turn. Use Sonnet for question generation and Opus for evaluation.
+  isn't billed at full price every turn. Question generation uses lower effort than grading.
 - **Grounding:** the evaluator should only criticize technical claims it can judge from the profile, dossier,
   repo files, or general knowledge. It should not invent facts about your project.
