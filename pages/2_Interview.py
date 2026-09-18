@@ -1,14 +1,15 @@
 import hashlib
-from dataclasses import dataclass
+from statistics import mean
 
 import streamlit as st
 
 from interviewer.delivery import Delivery, analyze
-from interviewer.feedback import Feedback, evaluate
 from interviewer.llm import LLMError
 from interviewer.profile import load_profile
-from interviewer.questions import DEPTHS, QUESTION_TYPES, Question, generate_question, pick_project, pick_type
+from interviewer.questions import DEPTHS, PERSONAS, QUESTION_TYPES
+from interviewer.session import MODES, Attempt, Session, Settings, build_plan
 from interviewer.speech import transcribe
+from interviewer.ui import average_scores, bullets, show_attempt, show_scores
 
 st.set_page_config(page_title="Interview · Interviewer", page_icon="🎙️")
 st.title("🎙️ Interview")
@@ -19,168 +20,216 @@ if profile.is_empty():
     st.page_link("pages/1_Profile.py", label="Go to Profile", icon="📝")
     st.stop()
 
-
-
-@dataclass
-class Attempt:
-    answer: str
-    feedback: Feedback
-    delivery: Delivery | None = None  # only for spoken answers
-    audio: bytes | None = None
-
-
 state = st.session_state
-state.setdefault("asked", [])  # every question asked this session, for variety
-state.setdefault("question", None)  # the current Question
-state.setdefault("attempts", [])  # Attempts at the current question
-
-# --- Settings ---------------------------------------------------------------
-
+state.setdefault("session", None)
+state.setdefault("past_questions", [])  # from earlier sessions, so questions don't repeat
+state.setdefault("last_settings", Settings(mode="free"))
+session: Session | None = state.session
 projects = profile.named_projects()
-with st.sidebar:
-    st.header("Question settings")
-    type_key = st.selectbox(
-        "Type",
-        ["mixed", *QUESTION_TYPES],
-        format_func=lambda k: "Mixed (random)" if k == "mixed" else QUESTION_TYPES[k].label,
-    )
-    about_project = type_key == "mixed" or QUESTION_TYPES[type_key].about_project
-    project_name = st.selectbox(
-        "Project",
-        ["any", *(p.name for p in projects)],
-        format_func=lambda n: "Rotate through all" if n == "any" else n,
-        disabled=not about_project or not projects,
-    )
-    depth = st.radio(
-        "Depth",
-        list(DEPTHS),
-        format_func={"any": "Any", "high": "High level", "low": "Low level"}.get,
-        horizontal=True,
-        disabled=not about_project,
-    )
-    speak = st.radio("Answer by", ["Speaking", "Typing"], horizontal=True) == "Speaking"
-    st.caption(f"{len(state.asked)} question(s) asked this session.")
 
 
-def new_question() -> bool:
-    chosen_type = pick_type(profile) if type_key == "mixed" else type_key
-    project = None
-    if QUESTION_TYPES[chosen_type].about_project:
-        if not projects:
-            st.error("Add at least one project to your profile for project questions.")
-            return False
-        if project_name == "any":
-            project = pick_project(profile, state.asked)
-        else:
-            project = next(p for p in projects if p.name == project_name)
-    with st.spinner("Thinking of a question..."):
+def run(action, spinner: str) -> bool:
+    """Run a Claude-backed action with a spinner. Shows the error and returns False if it fails."""
+    with st.spinner(spinner):
         try:
-            q = generate_question(profile, chosen_type, project, depth, state.asked)
+            action()
         except LLMError as e:
             st.error(str(e))
             return False
-    state.question = q
-    state.asked.append(q)
-    state.attempts = []
-    state.retrying = False
     return True
 
 
-if st.button("New question" if state.question else "Start", type="primary"):
-    new_question()
+def end_session() -> None:
+    state.past_questions += [t.question for t in session.turns]
+    state.session = None
 
-q: Question | None = state.question
-if q is None:
-    st.info("Pick a question type in the sidebar (or leave it on Mixed), then press **Start**.")
+
+with st.sidebar:
+    speak = st.radio("Answer by", ["Speaking", "Typing"], horizontal=True) == "Speaking"
+    if session and not session.finished:
+        st.divider()
+        st.markdown(f"**{session.mode.label}**")
+        if session.plan:
+            st.progress(session.main_asked / len(session.plan), f"Question {session.main_asked} of {len(session.plan)}")
+        else:
+            st.caption(f"{len(session.turns)} question(s) so far")
+        if session.answered():
+            if st.button("End session and see debrief", width="stretch"):
+                if run(lambda: session.finish(profile), "Reviewing your answers..."):
+                    st.rerun()
+        elif st.button("Cancel session", width="stretch"):
+            end_session()
+            st.rerun()
+
+# --- Setup ------------------------------------------------------------------
+
+
+def render_setup() -> None:
+    last: Settings = state.last_settings
+    modes = list(MODES)
+    mode = st.radio(
+        "Mode",
+        modes,
+        index=modes.index(last.mode),
+        format_func=lambda m: MODES[m].label,
+        captions=[MODES[m].description for m in modes],
+    )
+    settings = Settings(mode=mode, persona=last.persona)
+
+    if mode in ("free", "quick"):
+        types = ["mixed", *QUESTION_TYPES]
+        settings.type_key = st.selectbox(
+            "Question type",
+            types,
+            index=types.index(last.type_key),
+            format_func=lambda k: "Mixed (random)" if k == "mixed" else QUESTION_TYPES[k].label,
+        )
+    about_project = mode in ("deep_dive", "mock") or settings.type_key == "mixed" or QUESTION_TYPES[settings.type_key].about_project
+
+    if mode == "deep_dive":
+        if not projects:
+            st.error("Add a project to your profile first.")
+            st.stop()
+        names = [p.name for p in projects]
+        settings.project_name = st.selectbox(
+            "Project", names, index=names.index(last.project_name) if last.project_name in names else 0
+        )
+    elif mode in ("free", "quick") and about_project and projects:
+        options = [None, *(p.name for p in projects)]
+        settings.project_name = st.selectbox(
+            "Project",
+            options,
+            index=options.index(last.project_name) if last.project_name in options else 0,
+            format_func=lambda n: "Rotate through all" if n is None else n,
+        )
+        depths = list(DEPTHS)
+        settings.depth = st.radio(
+            "Depth",
+            depths,
+            index=depths.index(last.depth),
+            format_func={"any": "Any", "high": "High level", "low": "Low level"}.get,
+            horizontal=True,
+        )
+
+    personas = list(PERSONAS)
+    settings.persona = st.radio(
+        "Interviewer", personas, index=personas.index(last.persona), format_func=str.capitalize, horizontal=True,
+        help="\n\n".join(f"**{k.capitalize()}**: {v}" for k, v in PERSONAS.items()),
+    )
+    settings.feedback_at_end = st.toggle(
+        "Hold feedback until the end",
+        value=MODES[mode].feedback_at_end,
+        key=f"feedback_at_end_{mode}",
+        help="More realistic: the interviewer moves straight on (or follows up) and you get all the feedback at the end.",
+    )
+
+    if st.button("Start", type="primary"):
+        state.last_settings = settings
+        new = Session(settings, build_plan(settings, profile), previous=list(state.past_questions))
+        if run(lambda: new.ask_next_main(profile), "Thinking of a question..."):
+            state.session = new
+            st.rerun()
+
+
+if session is None:
+    render_setup()
     st.stop()
 
-# --- Question ---------------------------------------------------------------
+# --- Debrief ----------------------------------------------------------------
 
+
+def render_debrief() -> None:
+    st.header("Session debrief")
+    answered = session.answered()
+    if session.summary:
+        st.write(session.summary.overall)
+        show_scores(average_scores([t.latest.feedback for t in answered]))
+        spoken = [t.latest.delivery for t in answered if t.latest.delivery]
+        if spoken:
+            total_min = sum(d.minutes for d in spoken)
+            st.caption(
+                f"Delivery across {len(spoken)} spoken answer(s): {mean(d.wpm for d in spoken):.0f} wpm on average, "
+                f"{sum(sum(d.hesitations.values()) for d in spoken) / total_min:.1f} ums/uhs per minute, "
+                f"{sum(len(d.long_pauses) for d in spoken)} long pause(s)."
+            )
+        st.markdown("**🔁 Patterns**")
+        bullets(session.summary.patterns)
+        st.markdown("**🎯 Work on next**")
+        bullets(session.summary.priorities)
+        st.markdown("**📚 Review**")
+        bullets(session.summary.review_topics)
+
+    st.subheader("Your answers")
+    main_number = 0
+    for turn in answered:
+        if turn.question.is_follow_up:
+            label = f"Q{main_number} follow-up"
+        else:
+            main_number += 1
+            label = f"Q{main_number}"
+        with st.expander(f"{label}: {turn.question.text}"):
+            for i, a in enumerate(turn.attempts, 1):
+                show_attempt(a, f"Attempt {i}" if len(turn.attempts) > 1 else "Your answer")
+
+    if st.button("Start a new session", type="primary"):
+        end_session()
+        st.rerun()
+
+
+if session.finished:
+    render_debrief()
+    st.stop()
+
+# --- Current question -------------------------------------------------------
+
+turn = session.current
+q = turn.question
 label = QUESTION_TYPES[q.type_key].label
 if q.project_name:
     label += f" · {q.project_name}"
+if q.is_follow_up:
+    label = "Follow-up · " + label
 st.caption(label)
 st.markdown(f"### {q.text}")
 
-# --- Feedback ---------------------------------------------------------------
+holding = session.settings.feedback_at_end
+retrying = state.get("retrying_turn") == len(session.turns)
 
-
-def show_delivery(d: Delivery) -> None:
-    c1, c2, c3, c4 = st.columns(4)
-    seconds = round(d.duration)
-    c1.metric("Length", f"{seconds // 60}:{seconds % 60:02d}")
-    c2.metric("Pace", f"{d.wpm:.0f} wpm")
-    c3.metric("Ums / uhs", sum(d.hesitations.values()))
-    c4.metric("Long pauses", len(d.long_pauses))
-    notes = d.notes()
-    if notes:
-        st.markdown("\n".join(f"- {n}" for n in notes))
-    else:
-        st.markdown("- Delivery looked good: steady pace, few fillers, no long pauses.")
-    details = []
-    if d.crutches:
-        details.append("Crutch words: " + ", ".join(f'"{w}" x{n}' for w, n in d.crutches.most_common()))
-    for p in d.long_pauses:
-        details.append(f'Paused {p.seconds:.1f}s after "...{p.after}"')
-    if d.thinking_time >= 2:
-        details.append(f"{d.thinking_time:.0f}s of thinking before you started (that's fine)")
-    if details:
-        st.caption(" · ".join(details))
-
-
-def show_feedback(fb: Feedback) -> None:
-    st.write(fb.summary)
-    scores = fb.scores.model_dump()
-    for col, (name, score) in zip(st.columns(len(scores)), scores.items()):
-        col.metric(name.capitalize(), f"{score}/5")
-
-    sections = [
-        ("✅ What worked", fb.strengths),
-        ("🔧 What to improve", fb.improvements),
-        ("⚠️ Technical issues", fb.technical_issues),
-        ("🕳️ Missed points", fb.missed_points),
-    ]
-    for title, items in sections:
-        if items:
-            st.markdown(f"**{title}**")
-            st.markdown("\n".join(f"- {item}" for item in items))
-
-    st.markdown("**💬 A stronger version**")
-    st.info(fb.stronger_answer)
-
-    if fb.review_topics:
-        st.markdown("**📚 Review before your next interview**")
-        st.markdown("\n".join(f"- {t}" for t in fb.review_topics))
-
-
-def show_attempt(a: Attempt, number: int) -> None:
-    st.markdown(f"**Your answer** (attempt {number})")
-    if a.audio:
-        st.audio(a.audio, format="audio/wav")
-    st.write(a.answer)
-    if a.delivery:
-        st.markdown("#### Delivery")
-        show_delivery(a.delivery)
-    st.markdown("#### Content")
-    show_feedback(a.feedback)
-
-
-# Earlier attempts at this question, most recent first.
-for i, a in reversed(list(enumerate(state.attempts[:-1]))):
-    with st.expander(f"Attempt {i + 1}"):
-        show_attempt(a, i + 1)
-
-if state.attempts:
-    show_attempt(state.attempts[-1], len(state.attempts))
+# With feedback shown per answer, the answered question stays on screen with its feedback and choices.
+if turn.attempts and not holding:
+    for i, a in reversed(list(enumerate(turn.attempts[:-1], 1))):
+        with st.expander(f"Attempt {i}"):
+            show_attempt(a, "Your answer")
+    show_attempt(turn.latest, f"Your answer (attempt {len(turn.attempts)})")
     with st.expander("What a strong answer covers"):
-        st.markdown("\n".join(f"- {c}" for c in q.strong_answer_covers))
+        bullets(q.strong_answer_covers)
     st.divider()
-    c1, c2 = st.columns(2)
-    if c1.button("🔁 Try this question again", width="stretch"):
-        state.retrying = True
-        st.rerun()
-    if c2.button("➡️ Next question", width="stretch") and new_question():
-        st.rerun()
+
+    if not retrying:
+        follow_up = session.pending_follow_up()
+        cols = st.columns(3 if follow_up else 2)
+        if cols[0].button("🔁 Try again", width="stretch"):
+            state.retrying_turn = len(session.turns)
+            st.rerun()
+        if follow_up and cols[1].button("💬 Answer the follow-up", type="primary", width="stretch"):
+            session.ask_follow_up()
+            st.rerun()
+        if session.has_more_main:
+            if cols[-1].button("➡️ Next question", width="stretch"):
+                if run(lambda: session.ask_next_main(profile), "Thinking of a question..."):
+                    st.rerun()
+        elif cols[-1].button("🏁 Finish and see debrief", width="stretch"):
+            if run(lambda: session.finish(profile), "Writing your debrief..."):
+                st.rerun()
+        st.stop()
+
+if turn.attempts and holding and not retrying:
+    # Only happens if the answer was saved but loading the next question failed.
+    st.info("Your answer is saved.")
+    if st.button("Continue", type="primary"):
+        if run(lambda: session.advance(profile), "The interviewer is thinking..."):
+            st.rerun()
+    st.stop()
 
 # --- Answer -----------------------------------------------------------------
 
@@ -189,53 +238,53 @@ def submit(answer: str, delivery: Delivery | None = None, audio: bytes | None = 
     if not answer.strip():
         st.warning("There's no answer to submit yet.")
         return
-    with st.spinner("Reviewing your answer..."):
-        try:
-            fb = evaluate(profile, q, answer, delivery)
-        except LLMError as e:
-            st.error(str(e))
-            return
-    state.attempts.append(Attempt(answer, fb, delivery, audio))
-    state.retrying = False
-    st.rerun()
+
+    def action():
+        session.submit(profile, Attempt(answer, delivery, audio))
+        if holding:
+            session.advance(profile)
+
+    spinner = "The interviewer is thinking..." if holding else "Reviewing your answer..."
+    if run(action, spinner):
+        state.retrying_turn = None
+        st.rerun()
 
 
-if not state.attempts or state.get("retrying"):
-    # A fresh key per attempt clears the inputs on retry and on new questions.
-    attempt_key = f"{len(state.asked)}_{len(state.attempts)}"
+# A fresh key per question and attempt clears the inputs.
+attempt_key = f"{len(session.turns)}_{len(turn.attempts)}_{id(session)}"
 
-    if not speak:
-        answer = st.text_area("Your answer", key=f"answer_{attempt_key}", height=250)
-        if st.button("Submit answer"):
-            submit(answer)
-        st.stop()
-
-    audio = st.audio_input("Record your answer", key=f"audio_{attempt_key}")
-    if audio is None:
-        st.caption("Press the mic, answer out loud like you would in the real interview, then press stop.")
-        st.stop()
-
-    data = audio.getvalue()
-    digest = hashlib.sha1(data).hexdigest()
-    if state.get("transcript_digest") != digest:
-        with st.spinner("Transcribing... (the first time also downloads the speech model, which takes a minute)"):
-            try:
-                state.transcript = transcribe(data, profile)
-            except Exception as e:
-                st.error(f"Transcription failed: {e}")
-                st.stop()
-        state.transcript_digest = digest
-
-    transcript = state.transcript
-    if not transcript.words:
-        st.warning("Didn't catch any speech in that recording. Check your mic and record again.")
-        st.stop()
-
-    answer = st.text_area(
-        "Transcript (fix any misheard words, then submit)",
-        value=transcript.text,
-        key=f"transcript_{digest[:12]}",
-        height=200,
-    )
+if not speak:
+    answer = st.text_area("Your answer", key=f"answer_{attempt_key}", height=250)
     if st.button("Submit answer", type="primary"):
-        submit(answer, analyze(transcript), data)
+        submit(answer)
+    st.stop()
+
+audio = st.audio_input("Record your answer", key=f"audio_{attempt_key}")
+if audio is None:
+    st.caption("Press the mic, answer out loud like you would in the real interview, then press stop.")
+    st.stop()
+
+data = audio.getvalue()
+digest = hashlib.sha1(data).hexdigest()
+if state.get("transcript_digest") != digest:
+    with st.spinner("Transcribing... (the first time also downloads the speech model, which takes a minute)"):
+        try:
+            state.transcript = transcribe(data, profile)
+        except Exception as e:
+            st.error(f"Transcription failed: {e}")
+            st.stop()
+    state.transcript_digest = digest
+
+transcript = state.transcript
+if not transcript.words:
+    st.warning("Didn't catch any speech in that recording. Check your mic and record again.")
+    st.stop()
+
+answer = st.text_area(
+    "Transcript (fix any misheard words, then submit)",
+    value=transcript.text,
+    key=f"transcript_{digest[:12]}",
+    height=200,
+)
+if st.button("Submit answer", type="primary"):
+    submit(answer, analyze(transcript), data)

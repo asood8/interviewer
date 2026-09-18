@@ -50,3 +50,25 @@ comfortably out loud for the question (for a 30-second pitch, about 75 words; ot
 150-250 words).
 - review_topics are concrete things to study or prepare, e.g. "How Postgres indexes speed up \
 lookups" or "Have a number for how many users the app had". Not generic advice."""
+
+FOLLOW_UP = """\
+Decide whether to ask a follow-up to the candidate's last answer, the way a real interviewer would in \
+the moment. Follow-ups are where real interviews find the gaps, so ask one when there's something worth \
+pressing on:
+- something vague, hand-wavy, or unsupported ("you said it got faster; how much, and how did you measure it?")
+- a chance to go one level deeper on something they mentioned: from what to how, from how to why, from \
+the normal case to an edge case or failure
+- an interesting claim, choice, or tradeoff they brought up
+
+Build on what they actually said, using their words. Keep it to one natural spoken question, and don't \
+repeat anything already asked. If the answer fully covered the question and there's nothing worth \
+pressing on, or they were asking you questions at the end of the interview, return null."""
+
+SUMMARY = """\
+The mock interview session is over. Above are the questions, the candidate's final answers, and the \
+per-answer feedback. Write the end-of-session debrief:
+- overall: 2-4 sentences on how the session went, addressed to the candidate as "you"
+- patterns: habits that showed up in more than one answer, good and bad (e.g. "you open with \
+background instead of the answer", "you use 'we' for work you did yourself")
+- priorities: the 3 most important things to work on before the next session, most important first
+- review_topics: one merged, deduplicated list of concrete topics to study or prepare"""

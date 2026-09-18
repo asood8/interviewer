@@ -100,10 +100,23 @@ DEPTHS = {
 # Mixed mode favors project questions, since explaining projects is the main thing to practice.
 PROJECT_WEIGHT = 3
 
+PERSONAS = {
+    "friendly": "Friendly and encouraging, but still asks real questions.",
+    "neutral": "Professional and neutral, like a typical interviewer.",
+    "skeptical": (
+        "Skeptical and probing. Presses on vague or unsupported claims, asks how they know, "
+        "and politely challenges their choices."
+    ),
+}
+
 
 class GeneratedQuestion(BaseModel):
     question: str = Field(description="The question, as the interviewer would say it.")
     strong_answer_covers: list[str] = Field(description="3-6 short points a strong answer would cover.")
+
+
+class FollowUpDecision(BaseModel):
+    follow_up: GeneratedQuestion | None = Field(description="The follow-up question, or null if none is warranted.")
 
 
 @dataclass
@@ -113,6 +126,13 @@ class Question:
     project_name: str | None
     depth: str
     strong_answer_covers: list[str] = field(default_factory=list)
+    is_follow_up: bool = False
+
+
+def format_thread(thread: list[tuple[Question, str]]) -> str:
+    """A question-and-answer exchange as tagged text, oldest first."""
+    turns = [f"<question>\n{q.text}\n</question>\n<answer>\n{a.strip()}\n</answer>" for q, a in thread]
+    return "<conversation>\n" + "\n".join(turns) + "\n</conversation>"
 
 
 def pick_type(profile: Profile) -> str:
@@ -126,9 +146,14 @@ def pick_type(profile: Profile) -> str:
 def pick_project(profile: Profile, asked: list[Question]) -> Project:
     """Rotate through projects: pick randomly among the least-asked-about ones."""
     projects = profile.named_projects()
-    counts = Counter(q.project_name for q in asked)
+    counts = Counter(q.project_name for q in asked if not q.is_follow_up)
     fewest = min(counts[p.name] for p in projects)
     return random.choice([p for p in projects if counts[p.name] == fewest])
+
+
+def _already_asked(asked: list[Question]) -> str:
+    history = "\n".join(f"- {q.text}" for q in asked[-30:])
+    return f"<already_asked>\n{history}\n</already_asked>"
 
 
 def generate_question(
@@ -137,15 +162,15 @@ def generate_question(
     project: Project | None,
     depth: str,
     asked: list[Question],
+    persona: str = "neutral",
 ) -> Question:
     qtype = QUESTION_TYPES[type_key]
-    lines = [f"Question type: {qtype.label}. {qtype.description}"]
+    lines = [f"Interviewer style: {PERSONAS[persona]}", f"Question type: {qtype.label}. {qtype.description}"]
     if qtype.about_project and project:
         lines.append(f'Project: "{project.name}"')
         lines.append(f"Depth: {DEPTHS[depth]}")
     if asked:
-        history = "\n".join(f"- {q.text}" for q in asked[-30:])
-        lines.append(f"<already_asked>\n{history}\n</already_asked>")
+        lines.append(_already_asked(asked))
     lines.append("Write the next question.")
 
     result = llm.ask_structured(
@@ -160,4 +185,36 @@ def generate_question(
         project_name=project.name if qtype.about_project and project else None,
         depth=depth,
         strong_answer_covers=result.strong_answer_covers,
+    )
+
+
+def generate_follow_up(
+    profile: Profile,
+    thread: list[tuple[Question, str]],
+    asked: list[Question],
+    persona: str = "neutral",
+) -> Question | None:
+    """Decide, like a real interviewer would in the moment, whether to follow up on the last answer."""
+    root = thread[0][0]
+    lines = [
+        f"Interviewer style: {PERSONAS[persona]}",
+        format_thread(thread),
+        _already_asked(asked),
+        prompts.FOLLOW_UP,
+    ]
+    result = llm.ask_structured(
+        llm.system_blocks(profile.to_prompt(), prompts.INTERVIEWER),
+        "\n\n".join(lines),
+        FollowUpDecision,
+        effort="medium",
+    )
+    if result.follow_up is None:
+        return None
+    return Question(
+        text=result.follow_up.question,
+        type_key=root.type_key,
+        project_name=root.project_name,
+        depth=root.depth,
+        strong_answer_covers=result.follow_up.strong_answer_covers,
+        is_follow_up=True,
     )
