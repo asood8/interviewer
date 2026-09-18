@@ -3,6 +3,7 @@
 from pydantic import BaseModel, Field
 
 from interviewer import llm, prompts
+from interviewer.delivery import Delivery
 from interviewer.profile import Profile
 from interviewer.questions import QUESTION_TYPES, Question
 
@@ -27,7 +28,7 @@ class Feedback(BaseModel):
     review_topics: list[str] = Field(description="Concrete things to study or prepare before the next interview.")
 
 
-def evaluate(profile: Profile, question: Question, answer: str) -> Feedback:
+def evaluate(profile: Profile, question: Question, answer: str, delivery: Delivery | None = None) -> Feedback:
     qtype = QUESTION_TYPES[question.type_key]
     covers = "\n".join(f"- {c}" for c in question.strong_answer_covers)
     user = (
@@ -36,7 +37,8 @@ def evaluate(profile: Profile, question: Question, answer: str) -> Feedback:
         + f"<question>\n{question.text}\n</question>\n\n"
         f"<strong_answer_covers>\n{covers}\n</strong_answer_covers>\n\n"
         f"<candidate_answer>\n{answer.strip()}\n</candidate_answer>\n\n"
-        "Evaluate the answer."
+        + (f"<delivery>\n{delivery.to_prompt()}\n</delivery>\n\n" if delivery else "Typed answer.\n\n")
+        + "Evaluate the answer."
     )
     return llm.ask_structured(
         llm.system_blocks(profile.to_prompt(), prompts.EVALUATOR),
