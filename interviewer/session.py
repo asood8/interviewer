@@ -1,8 +1,10 @@
 """Interview sessions: modes, question plans, follow-up threads, and finishing with a debrief."""
 
 import random
+import uuid
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from datetime import datetime
 
 from interviewer.delivery import Delivery
 from interviewer.feedback import Feedback, SessionSummary, evaluate, summarize
@@ -87,6 +89,24 @@ class Attempt:
     delivery: Delivery | None = None  # only for spoken answers
     audio: bytes | None = None
     feedback: Feedback | None = None  # None until graded
+    audio_path: str = ""  # set once the recording is saved to disk
+
+    def to_dict(self) -> dict:
+        return {
+            "answer": self.answer,
+            "delivery": self.delivery.to_dict() if self.delivery else None,
+            "feedback": self.feedback.model_dump() if self.feedback else None,
+            "audio_path": self.audio_path,
+        }
+
+    @staticmethod
+    def from_dict(d: dict) -> "Attempt":
+        return Attempt(
+            answer=d["answer"],
+            delivery=Delivery.from_dict(d["delivery"]) if d["delivery"] else None,
+            feedback=Feedback.model_validate(d["feedback"]) if d["feedback"] else None,
+            audio_path=d["audio_path"],
+        )
 
 
 @dataclass
@@ -100,6 +120,23 @@ class Turn:
     def latest(self) -> Attempt | None:
         return self.attempts[-1] if self.attempts else None
 
+    def to_dict(self) -> dict:
+        return {
+            "question": asdict(self.question),
+            "root": self.root,
+            "attempts": [a.to_dict() for a in self.attempts],
+            "follow_up": asdict(self.follow_up) if self.follow_up else None,
+        }
+
+    @staticmethod
+    def from_dict(d: dict) -> "Turn":
+        return Turn(
+            question=Question(**d["question"]),
+            root=d["root"],
+            attempts=[Attempt.from_dict(a) for a in d["attempts"]],
+            follow_up=Question(**d["follow_up"]) if d["follow_up"] else None,
+        )
+
 
 @dataclass
 class Session:
@@ -110,6 +147,34 @@ class Session:
     main_asked: int = 0
     summary: SessionSummary | None = None
     finished: bool = False
+    id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    started_at: str = field(default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
+
+    def to_dict(self) -> dict:
+        """Everything worth keeping. Recordings live on disk, referenced by Attempt.audio_path."""
+        return {
+            "id": self.id,
+            "started_at": self.started_at,
+            "settings": asdict(self.settings),
+            "plan": [asdict(p) for p in self.plan],
+            "turns": [t.to_dict() for t in self.turns],
+            "main_asked": self.main_asked,
+            "summary": self.summary.model_dump() if self.summary else None,
+            "finished": self.finished,
+        }
+
+    @staticmethod
+    def from_dict(d: dict) -> "Session":
+        return Session(
+            settings=Settings(**d["settings"]),
+            plan=[Planned(**p) for p in d["plan"]],
+            turns=[Turn.from_dict(t) for t in d["turns"]],
+            main_asked=d["main_asked"],
+            summary=SessionSummary.model_validate(d["summary"]) if d["summary"] else None,
+            finished=d["finished"],
+            id=d["id"],
+            started_at=d["started_at"],
+        )
 
     @property
     def mode(self) -> Mode:

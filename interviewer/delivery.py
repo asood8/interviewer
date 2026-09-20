@@ -82,6 +82,31 @@ class Delivery:
         )
 
 
+
+    def to_dict(self) -> dict:
+        return {
+            "duration": self.duration,
+            "thinking_time": self.thinking_time,
+            "word_count": self.word_count,
+            "wpm": self.wpm,
+            "hesitations": dict(self.hesitations),
+            "crutches": dict(self.crutches),
+            "long_pauses": [{"seconds": p.seconds, "after": p.after} for p in self.long_pauses],
+        }
+
+    @staticmethod
+    def from_dict(d: dict) -> "Delivery":
+        return Delivery(
+            duration=d["duration"],
+            thinking_time=d["thinking_time"],
+            word_count=d["word_count"],
+            wpm=d["wpm"],
+            hesitations=Counter(d["hesitations"]),
+            crutches=Counter(d["crutches"]),
+            long_pauses=[Pause(**p) for p in d["long_pauses"]],
+        )
+
+
 def _norm(word: str) -> str:
     return re.sub(r"[^a-z']", "", word.lower())
 

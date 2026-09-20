@@ -8,7 +8,8 @@ import streamlit as st
 from interviewer.delivery import Delivery, analyze
 from interviewer.feedback import Feedback, Scores
 from interviewer.profile import Profile, load_profile, save_profile
-from interviewer.session import Attempt
+from interviewer.session import Attempt, Session
+from interviewer.storage import audio_source
 from interviewer.speech import transcribe
 
 
@@ -66,8 +67,9 @@ def show_feedback(fb: Feedback) -> None:
 
 def show_attempt(a: Attempt, label: str) -> None:
     st.markdown(f"**{label}**")
-    if a.audio:
-        st.audio(a.audio, format="audio/wav")
+    recording = a.audio or (audio_source(a.audio_path) if a.audio_path else None)
+    if recording:
+        st.audio(recording, format="audio/wav")
     st.write(a.answer)
     if a.delivery:
         st.markdown("#### Delivery")
@@ -75,6 +77,40 @@ def show_attempt(a: Attempt, label: str) -> None:
     if a.feedback:
         st.markdown("#### Content")
         show_feedback(a.feedback)
+
+
+def show_session(session: Session) -> None:
+    """The debrief: summary, averages, and every answer with its feedback."""
+    answered = session.answered()
+    if session.summary:
+        st.write(session.summary.overall)
+        show_scores(average_scores([t.latest.feedback for t in answered if t.latest.feedback]))
+        spoken = [t.latest.delivery for t in answered if t.latest.delivery]
+        if spoken:
+            total_min = sum(d.minutes for d in spoken)
+            st.caption(
+                f"Delivery across {len(spoken)} spoken answer(s): {mean(d.wpm for d in spoken):.0f} wpm on average, "
+                f"{sum(sum(d.hesitations.values()) for d in spoken) / total_min:.1f} ums/uhs per minute, "
+                f"{sum(len(d.long_pauses) for d in spoken)} long pause(s)."
+            )
+        st.markdown("**🔁 Patterns**")
+        bullets(session.summary.patterns)
+        st.markdown("**🎯 Work on next**")
+        bullets(session.summary.priorities)
+        st.markdown("**📚 Review**")
+        bullets(session.summary.review_topics)
+
+    st.subheader("Your answers")
+    main_number = 0
+    for turn in answered:
+        if turn.question.is_follow_up:
+            label = f"Q{main_number} follow-up"
+        else:
+            main_number += 1
+            label = f"Q{main_number}"
+        with st.expander(f"{label}: {turn.question.text}"):
+            for i, a in enumerate(turn.attempts, 1):
+                show_attempt(a, f"Attempt {i}" if len(turn.attempts) > 1 else "Your answer")
 
 
 def working_profile() -> Profile:

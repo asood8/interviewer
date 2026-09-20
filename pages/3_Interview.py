@@ -1,12 +1,11 @@
-from statistics import mean
-
 import streamlit as st
 
 from interviewer.delivery import Delivery, analyze
 from interviewer.llm import LLMError
 from interviewer.questions import DEPTHS, PERSONAS, QUESTION_TYPES
 from interviewer.session import MODES, Attempt, Session, Settings, build_plan
-from interviewer.ui import answer_input, average_scores, bullets, show_attempt, show_scores, working_profile
+from interviewer.storage import save_session
+from interviewer.ui import answer_input, bullets, show_attempt, show_session, working_profile
 
 st.set_page_config(page_title="Interview · Interviewer", page_icon="🎙️")
 st.title("🎙️ Interview")
@@ -26,13 +25,15 @@ projects = profile.named_projects()
 
 
 def run(action, spinner: str) -> bool:
-    """Run a Claude-backed action with a spinner. Shows the error and returns False if it fails."""
+    """Run a Claude-backed action with a spinner, then save. Shows the error and returns False if it fails."""
     with st.spinner(spinner):
         try:
             action()
         except LLMError as e:
             st.error(str(e))
             return False
+    if state.session:
+        save_session(state.session)
     return True
 
 
@@ -137,37 +138,7 @@ if session is None:
 
 def render_debrief() -> None:
     st.header("Session debrief")
-    answered = session.answered()
-    if session.summary:
-        st.write(session.summary.overall)
-        show_scores(average_scores([t.latest.feedback for t in answered]))
-        spoken = [t.latest.delivery for t in answered if t.latest.delivery]
-        if spoken:
-            total_min = sum(d.minutes for d in spoken)
-            st.caption(
-                f"Delivery across {len(spoken)} spoken answer(s): {mean(d.wpm for d in spoken):.0f} wpm on average, "
-                f"{sum(sum(d.hesitations.values()) for d in spoken) / total_min:.1f} ums/uhs per minute, "
-                f"{sum(len(d.long_pauses) for d in spoken)} long pause(s)."
-            )
-        st.markdown("**🔁 Patterns**")
-        bullets(session.summary.patterns)
-        st.markdown("**🎯 Work on next**")
-        bullets(session.summary.priorities)
-        st.markdown("**📚 Review**")
-        bullets(session.summary.review_topics)
-
-    st.subheader("Your answers")
-    main_number = 0
-    for turn in answered:
-        if turn.question.is_follow_up:
-            label = f"Q{main_number} follow-up"
-        else:
-            main_number += 1
-            label = f"Q{main_number}"
-        with st.expander(f"{label}: {turn.question.text}"):
-            for i, a in enumerate(turn.attempts, 1):
-                show_attempt(a, f"Attempt {i}" if len(turn.attempts) > 1 else "Your answer")
-
+    show_session(session)
     if st.button("Start a new session", type="primary"):
         end_session()
         st.rerun()

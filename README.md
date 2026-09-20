@@ -43,10 +43,14 @@ streamlit run app.py
    into, like a vague claim or a detail worth going deeper on. You can also pick a friendly, neutral, or skeptical
    interviewer. Every session ends with a debrief: average scores, patterns across your answers, and what to work on next.
 
+4. **History**: every session is saved as you go, so nothing is lost if you close the app. Reopen any past
+   session with its feedback, replay your own recordings, and watch your average score and filler-word rate
+   over time.
+
 Speech-to-text runs locally with [faster-whisper](https://github.com/SYSTRAN/faster-whisper). The first
 recording downloads the speech model (about 500 MB for `small.en`), which takes a minute. After that, a one-minute
 answer takes roughly 20-30 seconds to transcribe on a typical CPU. Set `WHISPER_MODEL=base.en` in `.env` if
 that's too slow.
 
-Your profile and recordings stay on your machine. Only the text transcript is sent to the Claude API. `data/` and `.env`
-are gitignored.
+Your profile, recordings, and session history stay on your machine, in `data/` (profile JSON, `history.db`,
+and the recordings). Only text is sent to the Claude API. `data/` and `.env` are gitignored.
