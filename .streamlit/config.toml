@@ -1,0 +1,8 @@
+# Headless stops Streamlit asking for an email on first run; run.bat opens the browser instead.
+[server]
+headless = true
+# Only this computer can reach the app: your profile and recordings aren't served to the network.
+address = "localhost"
+
+[browser]
+gatherUsageStats = false
