@@ -1,20 +1,17 @@
-import hashlib
 from statistics import mean
 
 import streamlit as st
 
 from interviewer.delivery import Delivery, analyze
 from interviewer.llm import LLMError
-from interviewer.profile import load_profile
 from interviewer.questions import DEPTHS, PERSONAS, QUESTION_TYPES
 from interviewer.session import MODES, Attempt, Session, Settings, build_plan
-from interviewer.speech import transcribe
-from interviewer.ui import average_scores, bullets, show_attempt, show_scores
+from interviewer.ui import answer_input, average_scores, bullets, show_attempt, show_scores, working_profile
 
 st.set_page_config(page_title="Interview · Interviewer", page_icon="🎙️")
 st.title("🎙️ Interview")
 
-profile = load_profile()
+profile = working_profile()
 if profile.is_empty():
     st.warning("Your profile is empty. Add your resume and projects first.")
     st.page_link("pages/1_Profile.py", label="Go to Profile", icon="📝")
@@ -253,38 +250,5 @@ def submit(answer: str, delivery: Delivery | None = None, audio: bytes | None = 
 # A fresh key per question and attempt clears the inputs.
 attempt_key = f"{len(session.turns)}_{len(turn.attempts)}_{id(session)}"
 
-if not speak:
-    answer = st.text_area("Your answer", key=f"answer_{attempt_key}", height=250)
-    if st.button("Submit answer", type="primary"):
-        submit(answer)
-    st.stop()
-
-audio = st.audio_input("Record your answer", key=f"audio_{attempt_key}")
-if audio is None:
-    st.caption("Press the mic, answer out loud like you would in the real interview, then press stop.")
-    st.stop()
-
-data = audio.getvalue()
-digest = hashlib.sha1(data).hexdigest()
-if state.get("transcript_digest") != digest:
-    with st.spinner("Transcribing... (the first time also downloads the speech model, which takes a minute)"):
-        try:
-            state.transcript = transcribe(data, profile)
-        except Exception as e:
-            st.error(f"Transcription failed: {e}")
-            st.stop()
-    state.transcript_digest = digest
-
-transcript = state.transcript
-if not transcript.words:
-    st.warning("Didn't catch any speech in that recording. Check your mic and record again.")
-    st.stop()
-
-answer = st.text_area(
-    "Transcript (fix any misheard words, then submit)",
-    value=transcript.text,
-    key=f"transcript_{digest[:12]}",
-    height=200,
-)
-if st.button("Submit answer", type="primary"):
-    submit(answer, analyze(transcript), data)
+if result := answer_input(profile, attempt_key, speak):
+    submit(*result)

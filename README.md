@@ -4,8 +4,9 @@ A local mock-interview app that practices you on **your own** resume and project
 questions a real interviewer would (from high-level pitches down to low-level "how does that part work"),
 then grades your answer, shows a stronger version in your own voice, and tells you what to review.
 
-See [OUTLINE.md](OUTLINE.md) for the full plan. Phases 1-3 are done: session modes, follow-up questions, and
-spoken or typed answers. Spoken answers also get delivery feedback (pace, ums and uhs, long pauses, length).
+See [OUTLINE.md](OUTLINE.md) for the full plan. Done so far: session modes, follow-up questions, spoken or
+typed answers, delivery feedback on spoken answers (pace, ums and uhs, long pauses, length), and the project
+prep notes that ground the questions in your actual work.
 
 ## Setup
 
@@ -23,7 +24,12 @@ streamlit run app.py
 
 1. **Profile**: paste your resume, add your background, and add each project with as much detail as you can
    (tech stack, your role, decisions, bugs, numbers). It saves automatically to `data/profile.json`.
-2. **Interview**: pick a mode:
+2. **Project prep** (do this before your first interview): Claude asks you about one project, about 10
+   questions, nothing graded, then writes up the notes: the problem, how it's built, your key decisions, the
+   hardest bug, the numbers, what you personally built, what you'd change, the concepts you should know cold,
+   and the facts you still need to go find out. Edit anything it got wrong. Every later question and
+   evaluation is grounded in these notes, so questions get much more specific.
+3. **Interview**: pick a mode:
    - **Free practice**: choose the question type, project, and depth yourself, as many questions as you like
    - **Quick drill**: 3 questions plus follow-ups
    - **Project deep-dive**: one project, from the elevator pitch down to implementation details

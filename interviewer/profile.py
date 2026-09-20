@@ -9,6 +9,46 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 PROFILE_PATH = DATA_DIR / "profile.json"
 
 
+# Dossier sections, in the order they're written and displayed.
+DOSSIER_SECTIONS = {
+    "problem": "The problem",
+    "architecture": "How it's built",
+    "decisions": "Key decisions",
+    "hardest_problem": "Hardest problem",
+    "impact": "Results and numbers",
+    "contribution": "What I built",
+    "what_id_change": "What I'd do differently",
+}
+DOSSIER_LISTS = {
+    "concepts_to_know": "Concepts to know cold",
+    "open_questions": "Still to find out",
+}
+
+
+class Dossier(BaseModel):
+    """Organized notes about one project: the facts, ready to study and to ground questions in."""
+
+    problem: str = ""
+    architecture: str = ""
+    decisions: str = ""
+    hardest_problem: str = ""
+    impact: str = ""
+    contribution: str = ""
+    what_id_change: str = ""
+    concepts_to_know: list[str] = []
+    open_questions: list[str] = []
+
+    def is_empty(self) -> bool:
+        return not any(getattr(self, f).strip() for f in DOSSIER_SECTIONS)
+
+    def to_prompt(self) -> str:
+        parts = [f"{label}: {getattr(self, key).strip()}" for key, label in DOSSIER_SECTIONS.items() if getattr(self, key).strip()]
+        for key, label in DOSSIER_LISTS.items():
+            if items := [i for i in getattr(self, key) if i.strip()]:
+                parts.append(f"{label}: " + "; ".join(items))
+        return "\n".join(parts)
+
+
 class Project(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
     name: str = ""
@@ -17,6 +57,7 @@ class Project(BaseModel):
     role: str = ""
     dates: str = ""
     notes: str = ""
+    dossier: Dossier | None = None
 
 
 class Profile(BaseModel):
@@ -54,6 +95,8 @@ class Profile(BaseModel):
                 ("notes", p.notes),
             ]
             body = "\n".join(f"{k}: {v.strip()}" for k, v in fields if v.strip())
+            if p.dossier and not p.dossier.is_empty():
+                body += f"\n<dossier>\n{p.dossier.to_prompt()}\n</dossier>"
             parts.append(f'<project name="{p.name.strip()}">\n{body}\n</project>')
         parts.append("</candidate_profile>")
         return "\n\n".join(parts)

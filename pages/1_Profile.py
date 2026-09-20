@@ -1,15 +1,13 @@
 import streamlit as st
 
-from interviewer.profile import Profile, Project, load_profile, save_profile
+from interviewer.profile import Profile, Project
+from interviewer.ui import autosave, working_profile
 
 st.set_page_config(page_title="Profile · Interviewer", page_icon="📝")
 st.title("📝 Profile")
 st.caption("Everything here is saved automatically to `data/profile.json` (never committed to git).")
 
-# The working copy lives in session state so edits survive switching pages.
-if "profile" not in st.session_state:
-    st.session_state.profile = load_profile()
-p: Profile = st.session_state.profile
+p: Profile = working_profile()
 
 st.header("About you")
 p.name = st.text_input("Name", value=p.name, key="name")
@@ -45,6 +43,10 @@ for proj in list(p.projects):
         proj.role = c1.text_input("Your role / team size", value=proj.role, key=f"{k}_role")
         proj.dates = c2.text_input("Dates", value=proj.dates, key=f"{k}_dates")
         proj.notes = st.text_area("Notes", value=proj.notes, key=f"{k}_notes", height=200)
+        if proj.dossier and not proj.dossier.is_empty():
+            st.page_link("pages/2_Project_prep.py", label="Prep notes written · edit them", icon="🗂️")
+        elif proj.name:
+            st.page_link("pages/2_Project_prep.py", label="Write prep notes for this project", icon="🗂️")
         if st.button("Delete project", key=f"{k}_delete", type="tertiary"):
             p.projects.remove(proj)
             st.rerun()
@@ -53,6 +55,4 @@ if st.button("➕ Add project"):
     p.projects.append(Project())
     st.rerun()
 
-if p != load_profile():
-    save_profile(p)
-    st.toast("Saved")
+autosave(p)

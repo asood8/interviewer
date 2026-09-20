@@ -1,12 +1,15 @@
 """Streamlit display helpers for answers, delivery, and feedback."""
 
+import hashlib
 from statistics import mean
 
 import streamlit as st
 
-from interviewer.delivery import Delivery
+from interviewer.delivery import Delivery, analyze
 from interviewer.feedback import Feedback, Scores
+from interviewer.profile import Profile, load_profile, save_profile
 from interviewer.session import Attempt
+from interviewer.speech import transcribe
 
 
 def bullets(items: list[str]) -> None:
@@ -72,3 +75,63 @@ def show_attempt(a: Attempt, label: str) -> None:
     if a.feedback:
         st.markdown("#### Content")
         show_feedback(a.feedback)
+
+
+def working_profile() -> Profile:
+    """One shared, editable copy of the profile per browser session, so pages don't clobber each other."""
+    if "profile" not in st.session_state:
+        st.session_state.profile = load_profile()
+    return st.session_state.profile
+
+
+def autosave(profile: Profile) -> None:
+    if profile != load_profile():
+        save_profile(profile)
+        st.toast("Saved")
+
+
+def answer_input(
+    profile: Profile, key: str, speak: bool, label: str = "Your answer", submit_label: str = "Submit answer"
+) -> tuple[str, Delivery | None, bytes | None] | None:
+    """The answer box: mic or keyboard. Returns (answer, delivery, audio) once submitted, else None."""
+    state = st.session_state
+    if not speak:
+        answer = st.text_area(label, key=f"answer_{key}", height=250)
+        if st.button(submit_label, type="primary"):
+            if answer.strip():
+                return answer, None, None
+            st.warning("There's nothing to submit yet.")
+        return None
+
+    audio = st.audio_input("Record your answer", key=f"audio_{key}")
+    if audio is None:
+        st.caption("Press the mic, answer out loud like you would in the real interview, then press stop.")
+        return None
+
+    data = audio.getvalue()
+    digest = hashlib.sha1(data).hexdigest()
+    if state.get("transcript_digest") != digest:
+        with st.spinner("Transcribing... (the first time also downloads the speech model, which takes a minute)"):
+            try:
+                state.transcript = transcribe(data, profile)
+            except Exception as e:
+                st.error(f"Transcription failed: {e}")
+                return None
+        state.transcript_digest = digest
+
+    transcript = state.transcript
+    if not transcript.words:
+        st.warning("Didn't catch any speech in that recording. Check your mic and record again.")
+        return None
+
+    answer = st.text_area(
+        "Transcript (fix any misheard words, then submit)",
+        value=transcript.text,
+        key=f"transcript_{digest[:12]}",
+        height=200,
+    )
+    if st.button(submit_label, type="primary"):
+        if answer.strip():
+            return answer, analyze(transcript), data
+        st.warning("There's nothing to submit yet.")
+    return None
