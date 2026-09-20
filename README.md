@@ -22,8 +22,11 @@ streamlit run app.py
 
 ## Using it
 
-1. **Profile**: paste your resume, add your background, and add each project with as much detail as you can
-   (tech stack, your role, decisions, bugs, numbers). It saves automatically to `data/profile.json`.
+1. **Profile**: upload your resume as a PDF (or paste the text), add your background, and add each project
+   with as much detail as you can: tech stack, your role, decisions, bugs, numbers. **Find projects in my
+   resume** pulls project entries out of the resume so you don't have to type them. Each project can also
+   point at a **repo** (a GitHub URL or a folder on your computer); Claude reads the README and main source
+   files so it can ask about the code you actually wrote. It all saves automatically to `data/profile.json`.
 2. **Project prep** (do this before your first interview): Claude asks you about one project, about 10
    questions, nothing graded, then writes up the notes: the problem, how it's built, your key decisions, the
    hardest bug, the numbers, what you personally built, what you'd change, the concepts you should know cold,

@@ -108,3 +108,12 @@ not marketing copy.
 them to explain, whether or not they explained them well here.
 - open_questions: facts they should go and find out (a real number for users, how a part they didn't \
 write actually works), including anything they said they weren't sure about."""
+
+FIND_PROJECTS_SYSTEM = """\
+You pull structured project entries out of a candidate's resume, so they don't have to type them in \
+by hand. Use only what the resume says. Never invent projects, technologies, numbers, or dates."""
+
+FIND_PROJECTS = """\
+List the projects in this resume: personal projects, course or hackathon projects, and substantial work \
+projects an interviewer would ask about. Skip the ones already in the profile, and skip plain job entries \
+with no specific project in them. Leave a field empty rather than guessing at it."""

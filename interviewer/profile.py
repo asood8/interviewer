@@ -58,6 +58,9 @@ class Project(BaseModel):
     dates: str = ""
     notes: str = ""
     dossier: Dossier | None = None
+    repo: str = ""  # GitHub URL or local folder
+    code: str = ""  # digest of that repo, from interviewer.repo.digest
+    code_updated: str = ""  # when the digest was taken
 
 
 class Profile(BaseModel):
@@ -97,6 +100,8 @@ class Profile(BaseModel):
             body = "\n".join(f"{k}: {v.strip()}" for k, v in fields if v.strip())
             if p.dossier and not p.dossier.is_empty():
                 body += f"\n<dossier>\n{p.dossier.to_prompt()}\n</dossier>"
+            if p.code.strip():
+                body += f"\n<code>\n{p.code.strip()}\n</code>"
             parts.append(f'<project name="{p.name.strip()}">\n{body}\n</project>')
         parts.append("</candidate_profile>")
         return "\n\n".join(parts)

@@ -3,3 +3,4 @@ streamlit>=1.64
 pydantic>=2.13
 python-dotenv>=1.2
 faster-whisper>=1.2
+pypdf>=6.0
