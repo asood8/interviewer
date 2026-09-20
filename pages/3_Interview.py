@@ -9,6 +9,7 @@ from interviewer.questions import DEPTHS, PERSONAS, QUESTION_TYPES
 from interviewer.session import MODES, Attempt, Session, Settings, build_plan
 from interviewer.storage import save_answer, save_session
 from interviewer.ui import answer_input, bullets, show_attempt, show_session, working_profile
+from interviewer.voice import speak
 
 st.set_page_config(page_title="Interview · Interviewer", page_icon="🎙️")
 st.title("🎙️ Interview")
@@ -46,7 +47,8 @@ def end_session() -> None:
 
 
 with st.sidebar:
-    speak = st.radio("Answer by", ["Speaking", "Typing"], horizontal=True) == "Speaking"
+    speaking = st.radio("Answer by", ["Speaking", "Typing"], horizontal=True) == "Speaking"
+    read_aloud = st.toggle("Read questions aloud", value=False, help="Uses your computer's voice.")
     if session and not session.finished:
         st.divider()
         st.markdown(f"**{session.mode.label}**")
@@ -124,6 +126,12 @@ def render_setup() -> None:
         help="More realistic: the interviewer moves straight on (or follows up) and you get all the feedback at the end.",
     )
 
+    if mode == "jd":
+        settings.job_description = st.text_area(
+            "Job description", value=last.job_description, height=200,
+            placeholder="Paste the job posting here.",
+        )
+
     if mode == "review":
         st.caption(
             "Re-asks the exact questions you scored lowest on, so you can see whether the second attempt is better."
@@ -132,6 +140,9 @@ def render_setup() -> None:
     if st.button("Start", type="primary"):
         state.last_settings = settings
         plan = build_plan(settings, profile)
+        if mode == "jd" and not settings.job_description.strip():
+            st.warning("Paste the job description first.")
+            st.stop()
         if mode == "review" and not plan:
             st.info("Nothing to review yet. Finish a session first, and any weak answers show up here.")
             st.stop()
@@ -171,6 +182,14 @@ if q.is_follow_up:
     label = "Follow-up · " + label
 st.caption(label)
 st.markdown(f"### {q.text}")
+if read_aloud:
+    audio = speak(q.text)
+    if audio is None:
+        st.caption("This computer has no working text-to-speech, so questions stay text-only.")
+    else:
+        st.audio(audio, format="audio/wav", autoplay=state.get("spoken_question") != q.text)
+        state.spoken_question = q.text
+
 if turn.previous_score is not None and not turn.attempts:
     st.caption(f"You scored {turn.previous_score:g}/5 on this one last time.")
 
@@ -249,5 +268,5 @@ def submit(answer: str, delivery: Delivery | None = None, audio: bytes | None = 
 # A fresh key per question and attempt clears the inputs.
 attempt_key = f"{len(session.turns)}_{len(turn.attempts)}_{id(session)}"
 
-if result := answer_input(profile, attempt_key, speak):
+if result := answer_input(profile, attempt_key, speaking):
     submit(*result)

@@ -117,3 +117,18 @@ FIND_PROJECTS = """\
 List the projects in this resume: personal projects, course or hackathon projects, and substantial work \
 projects an interviewer would ask about. Skip the ones already in the profile, and skip plain job entries \
 with no specific project in them. Leave a field empty rather than guessing at it."""
+
+CRAM_SHEET = """\
+Write the one-page sheet the candidate reads in the ten minutes before a real interview. Everything on it \
+must be specific to them: their projects, their stories, their past feedback. No generic interview advice.
+
+- summary: how they should pitch themselves for this interview, in 2-4 sentences.
+- lead_with: the projects and experience to bring up first, each with one line on why it fits.
+- stories: which of their own stories to use for the questions they're likely to get ("failure -> the \
+reconnect bug in ChatApp"). Only stories that appear in their profile, notes, or past answers.
+- concepts: what to brush up on, most likely to come up first. Pull from the review list and weak answers.
+- watch_outs: their own recurring habits to avoid, taken from past feedback (e.g. "you say 'we' for work \
+you did alone"). Leave empty if there's no feedback to go on.
+- questions_to_ask: good questions for them to ask the interviewer, specific to this role or company.
+
+If there's a job description, aim everything at that role. Keep each item to one line."""

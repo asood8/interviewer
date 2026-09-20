@@ -40,6 +40,12 @@ MODES = {
         2,
         True,
     ),
+    "jd": Mode(
+        "Job-description drill",
+        "Paste a job posting; the questions aim at what that role is looking for.",
+        2,
+        False,
+    ),
     "review": Mode(
         "Weak-spot review",
         "Re-answer the questions you scored lowest on, and see whether you've improved.",
@@ -68,6 +74,7 @@ class Settings:
     depth: str = "any"
     persona: str = "neutral"
     feedback_at_end: bool = False
+    job_description: str = ""
 
 
 def build_plan(settings: Settings, profile: Profile) -> list[Planned]:
@@ -79,6 +86,16 @@ def build_plan(settings: Settings, profile: Profile) -> list[Planned]:
         case "deep_dive":
             steps = [("pitch", "high"), ("drill_down", "low"), ("why_this", "any"), ("debugging", "any"), ("scaling", "any")]
             return [Planned(t, s.project_name, d) for t, d in steps]
+        case "jd":
+            plan = [Planned("about_me", None, "any")]
+            if profile.named_projects():
+                plan += [Planned(t, None, "any") for t in ("drill_down", "why_this")]
+            plan += [
+                Planned("concept_check" if profile.named_projects() else "behavioral", None, "any"),
+                Planned("behavioral", None, "any"),
+                Planned("motivation", None, "any"),
+            ]
+            return plan
         case "review":
             from interviewer import storage  # imported here: storage loads sessions, which live in this module
 
@@ -246,7 +263,7 @@ class Session:
         if QUESTION_TYPES[type_key].about_project:
             named = {pr.name: pr for pr in profile.named_projects()}
             project = named.get(p.project_name) or pick_project(profile, self.asked)
-        q = generate_question(profile, type_key, project, p.depth, self.asked, s.persona)
+        q = generate_question(profile, type_key, project, p.depth, self.asked, s.persona, s.job_description)
         self.turns.append(Turn(q, root=len(self.turns)))
         self.main_asked += 1
 
@@ -275,7 +292,10 @@ class Session:
         with ThreadPoolExecutor() as pool:
             follow_up = None
             if self.follow_ups_left(turn) > 0:
-                follow_up = pool.submit(generate_follow_up, profile, exchange, self.asked, self.settings.persona)
+                follow_up = pool.submit(
+                    generate_follow_up, profile, exchange, self.asked, self.settings.persona,
+                    self.settings.job_description,
+                )
             feedback = None
             if not self.settings.feedback_at_end:
                 feedback = pool.submit(

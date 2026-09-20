@@ -1,5 +1,9 @@
+from datetime import date
+
 import streamlit as st
 
+from interviewer.cram import SECTIONS, make_cram_sheet, to_markdown
+from interviewer.llm import LLMError
 from interviewer.questions import QUESTION_TYPES
 from interviewer.session import REVIEW_QUESTIONS
 from interviewer.storage import (
@@ -9,6 +13,7 @@ from interviewer.storage import (
     set_topic_done,
     weak_spots,
 )
+from interviewer.ui import bullets, working_profile
 
 st.set_page_config(page_title="Review · Interviewer", page_icon="📚")
 st.title("📚 Review")
@@ -18,7 +23,9 @@ weak = weak_spots()
 answers = list_saved_answers()
 
 to_review, done = [t for t in topics if not t.done], [t for t in topics if t.done]
-tabs = st.tabs([f"To review ({len(to_review)})", f"Weak spots ({len(weak)})", f"Answer bank ({len(answers)})"])
+tabs = st.tabs(
+    [f"To review ({len(to_review)})", f"Weak spots ({len(weak)})", f"Answer bank ({len(answers)})", "Cram sheet"]
+)
 
 with tabs[0]:
     st.caption("Everything Claude told you to study, collected from your sessions. Repeats float to the top.")
@@ -69,3 +76,36 @@ with tabs[2]:
             if st.button("Delete", key=f"del_answer_{saved.id}"):
                 delete_saved_answer(saved.id)
                 st.rerun()
+
+with tabs[3]:
+    st.caption(
+        "The page to read in the ten minutes before a real interview: what to lead with, which stories to "
+        "use, what to brush up on, and what to ask them."
+    )
+    job = st.text_area("Job description (optional)", height=150, placeholder="Paste the posting to aim the sheet at one role.")
+    if st.button("Write my cram sheet", type="primary"):
+        with st.spinner("Pulling it together..."):
+            try:
+                st.session_state.cram_sheet = make_cram_sheet(
+                    working_profile(),
+                    job,
+                    [t.text for t in to_review],
+                    [f"{w.question.text} (scored {w.score:g}/5)" for w in weak],
+                )
+            except LLMError as e:
+                st.error(str(e))
+
+    sheet = st.session_state.get("cram_sheet")
+    if sheet:
+        st.divider()
+        st.write(sheet.summary)
+        for key, heading in SECTIONS:
+            if items := getattr(sheet, key):
+                st.markdown(f"**{heading}**")
+                bullets(items)
+        st.download_button(
+            "Download as Markdown",
+            to_markdown(sheet),
+            file_name=f"cram-sheet-{date.today().isoformat()}.md",
+            mime="text/markdown",
+        )

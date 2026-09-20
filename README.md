@@ -4,9 +4,7 @@ A local mock-interview app that practices you on **your own** resume and project
 questions a real interviewer would (from high-level pitches down to low-level "how does that part work"),
 then grades your answer, shows a stronger version in your own voice, and tells you what to review.
 
-See [OUTLINE.md](OUTLINE.md) for the full plan. Done so far: session modes, follow-up questions, spoken or
-typed answers, delivery feedback on spoken answers (pace, ums and uhs, long pauses, length), and the project
-prep notes that ground the questions in your actual work.
+See [OUTLINE.md](OUTLINE.md) for the full plan; all of it is built.
 
 ## Setup
 
@@ -37,16 +35,21 @@ streamlit run app.py
    - **Quick drill**: 3 questions plus follow-ups
    - **Project deep-dive**: one project, from the elevator pitch down to implementation details
    - **Full mock interview**: intro, projects, behavioral, and your questions for them, with feedback held until the end
+   - **Job-description drill**: paste a posting and get questions aimed at that role
+   - **Weak-spot review**: re-answer the questions you scored lowest on
 
    Record your answer with the mic (or switch to typing in the sidebar), fix any misheard words in the
    transcript, and submit. The interviewer follows up on what you actually said when there's something to dig
    into, like a vague claim or a detail worth going deeper on. You can also pick a friendly, neutral, or skeptical
-   interviewer. Every session ends with a debrief: average scores, patterns across your answers, and what to work on next.
+   interviewer, and have the questions read out loud by your computer's voice. Every session ends with a
+   debrief: average scores, patterns across your answers, and what to work on next.
 
 4. **Review**: everything Claude told you to study, collected in one list (repeats float to the top, tick
    them off as you go); your **weak spots**, the questions your latest answers scored lowest on, which you can
    re-answer in a weak-spot review session that shows whether the second attempt beat the first; and your
-   **answer bank** of answers worth keeping, saved with the ⭐ button under any answer's feedback.
+   **answer bank** of answers worth keeping, saved with the ⭐ button under any answer's feedback. The
+   **cram sheet** tab writes the page to read ten minutes before a real interview: what to lead with, which
+   of your stories to use, what to brush up on, your own habits to avoid, and what to ask them.
 5. **History**: every session is saved as you go, so nothing is lost if you close the app. Reopen any past
    session with its feedback, replay your own recordings, and watch your average score and filler-word rate
    over time.

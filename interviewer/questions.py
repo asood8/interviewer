@@ -151,6 +151,16 @@ def pick_project(profile: Profile, asked: list[Question]) -> Project:
     return random.choice([p for p in projects if counts[p.name] == fewest])
 
 
+def _job_description(text: str) -> list[str]:
+    if not text.strip():
+        return []
+    return [
+        f"<job_description>\n{text.strip()}\n</job_description>",
+        "Aim the question at this role: favour the parts of their experience the posting cares about, "
+        "and the skills it asks for. Don't mention the posting itself.",
+    ]
+
+
 def _already_asked(asked: list[Question]) -> str:
     history = "\n".join(f"- {q.text}" for q in asked[-30:])
     return f"<already_asked>\n{history}\n</already_asked>"
@@ -163,9 +173,11 @@ def generate_question(
     depth: str,
     asked: list[Question],
     persona: str = "neutral",
+    job_description: str = "",
 ) -> Question:
     qtype = QUESTION_TYPES[type_key]
     lines = [f"Interviewer style: {PERSONAS[persona]}", f"Question type: {qtype.label}. {qtype.description}"]
+    lines += _job_description(job_description)
     if qtype.about_project and project:
         lines.append(f'Project: "{project.name}"')
         lines.append(f"Depth: {DEPTHS[depth]}")
@@ -193,11 +205,13 @@ def generate_follow_up(
     thread: list[tuple[Question, str]],
     asked: list[Question],
     persona: str = "neutral",
+    job_description: str = "",
 ) -> Question | None:
     """Decide, like a real interviewer would in the moment, whether to follow up on the last answer."""
     root = thread[0][0]
     lines = [
         f"Interviewer style: {PERSONAS[persona]}",
+        *_job_description(job_description),
         format_thread(thread),
         _already_asked(asked),
         prompts.FOLLOW_UP,

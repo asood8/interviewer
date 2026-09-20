@@ -4,6 +4,8 @@ A local app for voice-based mock interviews. You give it your resume, your proje
 It asks you the questions a real interviewer would ask, listens to your spoken answers, and tells you what went
 well, what didn't, and what to study.
 
+**Status:** all seven build phases below are implemented. See the README for how to run it.
+
 **Main goal:** get better at explaining my own projects, both the high-level story ("what is it and why does it
 matter") and the low-level details ("why did you use X, how does Y actually work, what broke").
 
