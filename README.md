@@ -8,15 +8,28 @@ See [OUTLINE.md](OUTLINE.md) for the full plan; all of it is built.
 
 ## Setup
 
-Requires Python 3.12+ and an [Anthropic API key](https://console.anthropic.com).
+Requires Python 3.12+ and an [Anthropic API key](https://console.anthropic.com). The API is pay-as-you-go and
+billed separately from a Claude Pro or Max subscription, which does **not** include API credit.
+
+Put your key in a `.env` file first (`copy .env.example .env`, then edit it):
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**Windows:** double-click `run.bat`. The first run creates the virtual environment and installs everything,
+then starts the app and opens your browser. Later runs just start it.
+
+**Everything else:**
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate          # Windows (macOS/Linux: source .venv/bin/activate)
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env            # then put your key in .env
-streamlit run app.py
+streamlit run app.py            # then open http://localhost:8501
 ```
+
+The app listens on this computer only, so nothing is served to your network.
 
 ## Using it
 
