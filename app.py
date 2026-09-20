@@ -21,5 +21,6 @@ else:
     st.page_link("pages/3_Interview.py", label="Start practicing", icon="🎙️")
     if len(prepped) < len(projects):
         st.page_link("pages/2_Project_prep.py", label="Write prep notes for a project", icon="🗂️")
+    st.page_link("pages/5_Review.py", label="What to review, weak spots, answer bank", icon="📚")
     st.page_link("pages/4_History.py", label="Past sessions and progress", icon="📈")
     st.page_link("pages/1_Profile.py", label="Edit profile", icon="📝")

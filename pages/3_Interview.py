@@ -1,10 +1,13 @@
+from statistics import mean
+
 import streamlit as st
 
 from interviewer.delivery import Delivery, analyze
+from interviewer.feedback import Scores
 from interviewer.llm import LLMError
 from interviewer.questions import DEPTHS, PERSONAS, QUESTION_TYPES
 from interviewer.session import MODES, Attempt, Session, Settings, build_plan
-from interviewer.storage import save_session
+from interviewer.storage import save_answer, save_session
 from interviewer.ui import answer_input, bullets, show_attempt, show_session, working_profile
 
 st.set_page_config(page_title="Interview · Interviewer", page_icon="🎙️")
@@ -121,9 +124,18 @@ def render_setup() -> None:
         help="More realistic: the interviewer moves straight on (or follows up) and you get all the feedback at the end.",
     )
 
+    if mode == "review":
+        st.caption(
+            "Re-asks the exact questions you scored lowest on, so you can see whether the second attempt is better."
+        )
+
     if st.button("Start", type="primary"):
         state.last_settings = settings
-        new = Session(settings, build_plan(settings, profile), previous=list(state.past_questions))
+        plan = build_plan(settings, profile)
+        if mode == "review" and not plan:
+            st.info("Nothing to review yet. Finish a session first, and any weak answers show up here.")
+            st.stop()
+        new = Session(settings, plan, previous=list(state.past_questions))
         if run(lambda: new.ask_next_main(profile), "Thinking of a question..."):
             state.session = new
             st.rerun()
@@ -159,6 +171,8 @@ if q.is_follow_up:
     label = "Follow-up · " + label
 st.caption(label)
 st.markdown(f"### {q.text}")
+if turn.previous_score is not None and not turn.attempts:
+    st.caption(f"You scored {turn.previous_score:g}/5 on this one last time.")
 
 holding = session.settings.feedback_at_end
 retrying = state.get("retrying_turn") == len(session.turns)
@@ -169,6 +183,20 @@ if turn.attempts and not holding:
         with st.expander(f"Attempt {i}"):
             show_attempt(a, "Your answer")
     show_attempt(turn.latest, f"Your answer (attempt {len(turn.attempts)})")
+    if turn.previous_score is not None and turn.latest.feedback:
+        now = mean(getattr(turn.latest.feedback.scores, f) for f in Scores.model_fields)
+        change = now - turn.previous_score
+        st.metric(
+            "This question, then and now",
+            f"{now:.1f}/5",
+            f"{change:+.1f} vs {turn.previous_score:g}/5 last time",
+            delta_color="normal" if change else "off",
+        )
+
+    if st.button("⭐ Save to the answer bank"):
+        save_answer(q.text, q.project_name, turn.latest.answer, turn.latest.feedback.stronger_answer if turn.latest.feedback else None)
+        st.toast("Saved to the answer bank")
+
     with st.expander("What a strong answer covers"):
         bullets(q.strong_answer_covers)
     st.divider()

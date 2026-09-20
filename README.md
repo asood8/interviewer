@@ -43,7 +43,11 @@ streamlit run app.py
    into, like a vague claim or a detail worth going deeper on. You can also pick a friendly, neutral, or skeptical
    interviewer. Every session ends with a debrief: average scores, patterns across your answers, and what to work on next.
 
-4. **History**: every session is saved as you go, so nothing is lost if you close the app. Reopen any past
+4. **Review**: everything Claude told you to study, collected in one list (repeats float to the top, tick
+   them off as you go); your **weak spots**, the questions your latest answers scored lowest on, which you can
+   re-answer in a weak-spot review session that shows whether the second attempt beat the first; and your
+   **answer bank** of answers worth keeping, saved with the ⭐ button under any answer's feedback.
+5. **History**: every session is saved as you go, so nothing is lost if you close the app. Reopen any past
    session with its feedback, replay your own recordings, and watch your average score and filler-word rate
    over time.
 

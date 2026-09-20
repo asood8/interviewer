@@ -40,7 +40,15 @@ MODES = {
         2,
         True,
     ),
+    "review": Mode(
+        "Weak-spot review",
+        "Re-answer the questions you scored lowest on, and see whether you've improved.",
+        1,
+        False,
+    ),
 }
+
+REVIEW_QUESTIONS = 5  # how many weak spots one review session covers
 
 
 @dataclass(frozen=True)
@@ -48,6 +56,8 @@ class Planned:
     type_key: str  # a QUESTION_TYPES key, or "mixed"
     project_name: str | None  # None rotates through projects
     depth: str
+    question: Question | None = None  # set to re-ask a past question verbatim
+    previous_score: float | None = None  # what it scored last time
 
 
 @dataclass
@@ -69,6 +79,10 @@ def build_plan(settings: Settings, profile: Profile) -> list[Planned]:
         case "deep_dive":
             steps = [("pitch", "high"), ("drill_down", "low"), ("why_this", "any"), ("debugging", "any"), ("scaling", "any")]
             return [Planned(t, s.project_name, d) for t, d in steps]
+        case "review":
+            from interviewer import storage  # imported here: storage loads sessions, which live in this module
+
+            return storage.weak_spot_plan(REVIEW_QUESTIONS)
         case "mock":
             plan = [Planned("about_me", None, "any")]
             if profile.named_projects():
@@ -81,6 +95,17 @@ def build_plan(settings: Settings, profile: Profile) -> list[Planned]:
             ]
             return plan
     return []
+
+
+def _planned_from_dict(d: dict) -> Planned:
+    question = d.get("question")
+    return Planned(
+        type_key=d["type_key"],
+        project_name=d["project_name"],
+        depth=d["depth"],
+        question=Question(**question) if question else None,
+        previous_score=d.get("previous_score"),
+    )
 
 
 @dataclass
@@ -115,6 +140,7 @@ class Turn:
     root: int  # index in Session.turns of the main question this turn follows up on (itself if main)
     attempts: list[Attempt] = field(default_factory=list)
     follow_up: Question | None = None  # what the interviewer would ask next, given the latest attempt
+    previous_score: float | None = None  # when re-asking, what this question scored last time
 
     @property
     def latest(self) -> Attempt | None:
@@ -126,6 +152,7 @@ class Turn:
             "root": self.root,
             "attempts": [a.to_dict() for a in self.attempts],
             "follow_up": asdict(self.follow_up) if self.follow_up else None,
+            "previous_score": self.previous_score,
         }
 
     @staticmethod
@@ -135,6 +162,7 @@ class Turn:
             root=d["root"],
             attempts=[Attempt.from_dict(a) for a in d["attempts"]],
             follow_up=Question(**d["follow_up"]) if d["follow_up"] else None,
+            previous_score=d.get("previous_score"),
         )
 
 
@@ -167,7 +195,7 @@ class Session:
     def from_dict(d: dict) -> "Session":
         return Session(
             settings=Settings(**d["settings"]),
-            plan=[Planned(**p) for p in d["plan"]],
+            plan=[_planned_from_dict(p) for p in d["plan"]],
             turns=[Turn.from_dict(t) for t in d["turns"]],
             main_asked=d["main_asked"],
             summary=SessionSummary.model_validate(d["summary"]) if d["summary"] else None,
@@ -209,6 +237,10 @@ class Session:
     def ask_next_main(self, profile: Profile) -> None:
         s = self.settings
         p = self.plan[self.main_asked] if self.plan else Planned(s.type_key, s.project_name, s.depth)
+        if p.question is not None:  # a weak spot being re-asked: no need to write a new question
+            self.turns.append(Turn(p.question, root=len(self.turns), previous_score=p.previous_score))
+            self.main_asked += 1
+            return
         type_key = pick_type(profile) if p.type_key == "mixed" else p.type_key
         project = None
         if QUESTION_TYPES[type_key].about_project:
