@@ -77,3 +77,7 @@ that's too slow.
 
 Your profile, recordings, and session history stay on your machine, in `data/` (profile JSON, `history.db`,
 and the recordings). Only text is sent to the Claude API. `data/` and `.env` are gitignored.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
