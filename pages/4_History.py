@@ -30,7 +30,7 @@ def session_stats(session: Session) -> dict | None:
     scores = [mean(getattr(a.feedback.scores, f) for f in Scores.model_fields) for a in attempts]
     spoken = [a.delivery for a in attempts if a.delivery]
     row = {
-        "date": session.started_at[:19].replace("T", " "),
+        "date": session.started_at[:16].replace("T", " "),
         "Average score": round(mean(scores), 2),
         "Answers": len(attempts),
     }

@@ -1,26 +1,40 @@
 # Interviewer
 
-A local mock-interview app that practices you on **your own** resume and projects. Claude asks the kind of
-questions a real interviewer would (from high-level pitches down to low-level "how does that part work"),
-then grades your answer, shows a stronger version in your own voice, and tells you what to review.
+I have decent projects on my resume and I'm bad at talking about them. Ask me anything more specific than
+"what does it do" and I lose the thread. So I built this: a mock interviewer that only asks about my own
+resume and projects, listens to me answer out loud, and then tells me what was weak.
 
-See [OUTLINE.md](OUTLINE.md) for the full plan; all of it is built.
+It runs on your machine and talks to the Claude API. Nothing is hosted.
+
+![An answer with its feedback](docs/screenshots/interview.png)
+
+## What it actually does
+
+You give it your resume and a page of notes per project. It asks the kind of question an interviewer would
+ask about *that* project, you answer out loud, and it grades the answer: six scores, what worked, what to
+fix, anything you got technically wrong, and a rewritten version of your answer in your own words with
+`[placeholder]` wherever you're missing a fact. Then it usually follows up on whatever you were vague about,
+which is the part I found most useful and least comfortable.
+
+Spoken answers get a second kind of feedback the model isn't involved in: speaking pace, how many times you
+said "um", and where you paused for more than three seconds. The pauses are the interesting bit, since they
+land exactly where you ran out of prepared material.
 
 ## Setup
 
-Requires Python 3.12+ and an [Anthropic API key](https://console.anthropic.com). The API is pay-as-you-go and
-billed separately from a Claude Pro or Max subscription, which does **not** include API credit.
+You need Python 3.12 or newer and an [Anthropic API key](https://console.anthropic.com). Note that the API is
+pay-as-you-go and separate from a Claude Pro or Max subscription: the subscription gets you nothing here, you
+have to put a few dollars of credit on the API account.
 
-Put your key in a `.env` file first (`copy .env.example .env`, then edit it):
+Make a `.env` file next to `app.py` (`copy .env.example .env`) with your key in it:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-**Windows:** double-click `run.bat`. The first run creates the virtual environment and installs everything,
-then starts the app and opens your browser. Later runs just start it.
-
-**Everything else:**
+On Windows, double-click `run.bat`. The first run builds the virtual environment and installs everything,
+which takes a few minutes, then it starts the app and opens a browser tab. After that it just starts.
+On macOS and Linux, `./run.sh` does the same thing. If you'd rather do it by hand:
 
 ```bash
 python -m venv .venv
@@ -29,54 +43,56 @@ pip install -r requirements.txt
 streamlit run app.py            # then open http://localhost:8501
 ```
 
-(On Mac and Linux, `./run.sh` does the same as `run.bat`.)
+## How you use it
 
-The app listens on this computer only, so nothing is served to your network. Reading questions aloud uses
-your system voice, which on Linux needs `espeak` installed; without it, questions stay text-only.
+**Start with your profile.** Upload your resume as a PDF or paste the text in, then add your projects.
+There's a button that reads the resume and pulls out the projects it finds, which saves some typing. You can
+also point a project at its GitHub repo or a folder on disk, and it'll read the README and the main source
+files so the questions can get into your actual code.
 
-## Using it
+**Then do the project prep.** This is the part I'd skip if I were you, and I'd be wrong to. It asks about ten
+questions about one project, nothing graded, and writes up what you tell it: the problem, how it's built, the
+decisions you made and what you rejected, the hardest bug, the numbers, what you'd change. Every question
+after that is grounded in these notes, and honestly the writeup alone fixed half my problem, because most of
+my stumbling was never having said this stuff out loud in order.
 
-1. **Profile**: upload your resume as a PDF (or paste the text), add your background, and add each project
-   with as much detail as you can: tech stack, your role, decisions, bugs, numbers. **Find projects in my
-   resume** pulls project entries out of the resume so you don't have to type them. Each project can also
-   point at a **repo** (a GitHub URL or a folder on your computer); Claude reads the README and main source
-   files so it can ask about the code you actually wrote. It all saves automatically to `data/profile.json`.
-2. **Project prep** (do this before your first interview): Claude asks you about one project, about 10
-   questions, nothing graded, then writes up the notes: the problem, how it's built, your key decisions, the
-   hardest bug, the numbers, what you personally built, what you'd change, the concepts you should know cold,
-   and the facts you still need to go find out. Edit anything it got wrong. Every later question and
-   evaluation is grounded in these notes, so questions get much more specific.
-3. **Interview**: pick a mode:
-   - **Free practice**: choose the question type, project, and depth yourself, as many questions as you like
-   - **Quick drill**: 3 questions plus follow-ups
-   - **Project deep-dive**: one project, from the elevator pitch down to implementation details
-   - **Full mock interview**: intro, projects, behavioral, and your questions for them, with feedback held until the end
-   - **Job-description drill**: paste a posting and get questions aimed at that role
-   - **Weak-spot review**: re-answer the questions you scored lowest on
+![The written-up project notes](docs/screenshots/project-prep.png)
 
-   Record your answer with the mic (or switch to typing in the sidebar), fix any misheard words in the
-   transcript, and submit. The interviewer follows up on what you actually said when there's something to dig
-   into, like a vague claim or a detail worth going deeper on. You can also pick a friendly, neutral, or skeptical
-   interviewer, and have the questions read out loud by your computer's voice. Every session ends with a
-   debrief: average scores, patterns across your answers, and what to work on next.
+**Then interview.** Six modes: free practice, a three-question drill, a deep dive on one project, a full mock
+interview (feedback held until the end, like the real thing), a drill aimed at a job posting you paste in, and
+a weak-spot session that re-asks the questions you did worst on. You can make the interviewer friendly,
+neutral or skeptical. Skeptical is unpleasant and probably the most useful.
 
-4. **Review**: everything Claude told you to study, collected in one list (repeats float to the top, tick
-   them off as you go); your **weak spots**, the questions your latest answers scored lowest on, which you can
-   re-answer in a weak-spot review session that shows whether the second attempt beat the first; and your
-   **answer bank** of answers worth keeping, saved with the ⭐ button under any answer's feedback. The
-   **cram sheet** tab writes the page to read ten minutes before a real interview: what to lead with, which
-   of your stories to use, what to brush up on, your own habits to avoid, and what to ask them.
-5. **History**: every session is saved as you go, so nothing is lost if you close the app. Reopen any past
-   session with its feedback, replay your own recordings, and watch your average score and filler-word rate
-   over time.
+**Review and history.** Everything Claude tells you to study piles up in one list, and topics that keep coming
+back sort to the top. Your worst-scoring questions are listed separately so you can go again at them, and when
+you do, it shows the old score next to the new one. There's also a cram sheet for the ten minutes before a
+real interview: which project to lead with, which story to use where, what to brush up on, and your own bad
+habits to watch for.
 
-Speech-to-text runs locally with [faster-whisper](https://github.com/SYSTRAN/faster-whisper). The first
-recording downloads the speech model (about 500 MB for `small.en`), which takes a minute. After that, a one-minute
-answer takes roughly 20-30 seconds to transcribe on a typical CPU. Set `WHISPER_MODEL=base.en` in `.env` if
-that's too slow.
+![Weak spots](docs/screenshots/review-weak.png)
+![Session history and trends](docs/screenshots/history.png)
 
-Your profile, recordings, and session history stay on your machine, in `data/` (profile JSON, `history.db`,
-and the recordings). Only text is sent to the Claude API. `data/` and `.env` are gitignored.
+## Cost and privacy
+
+Your profile is cached between calls, so a session costs cents rather than dollars. If you want it cheaper,
+put `INTERVIEWER_MODEL=claude-sonnet-5` in `.env`.
+
+Speech-to-text runs locally through [faster-whisper](https://github.com/SYSTRAN/faster-whisper), so your
+recordings never leave the machine; only the transcript text goes to the API. The first recording downloads
+the model, about 500 MB, which takes a minute. After that a one-minute answer takes 20-30 seconds to
+transcribe on a normal CPU, and `WHISPER_MODEL=base.en` in `.env` makes that faster if you're impatient.
+
+Everything else lives in `data/`: your profile, the recordings, and a SQLite file with every session. That
+folder and `.env` are gitignored, and the app only listens on localhost.
+
+## Rough edges
+
+Reading questions aloud uses the system voice, which needs `espeak` on Linux and sounds like a robot
+everywhere. The filler-word counting depends on Whisper transcribing "um", which it does most of the time but
+not always. The screenshots above use a made-up profile, not mine.
+
+[OUTLINE.md](OUTLINE.md) has the original plan and the reasoning behind it, if you want to see where this was
+going.
 
 ## License
 
