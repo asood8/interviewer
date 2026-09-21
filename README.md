@@ -29,7 +29,10 @@ pip install -r requirements.txt
 streamlit run app.py            # then open http://localhost:8501
 ```
 
-The app listens on this computer only, so nothing is served to your network.
+(On Mac and Linux, `./run.sh` does the same as `run.bat`.)
+
+The app listens on this computer only, so nothing is served to your network. Reading questions aloud uses
+your system voice, which on Linux needs `espeak` installed; without it, questions stay text-only.
 
 ## Using it
 

@@ -63,3 +63,8 @@ def ask_structured[T: BaseModel](system: list[dict], user: str, schema: type[T],
     if response.parsed_output is None:
         raise LLMError("Claude returned a response that couldn't be parsed. Try again.")
     return response.parsed_output
+
+
+def has_credentials() -> bool:
+    """Whether an API key is configured at all. Used to warn before the first call fails."""
+    return bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN"))

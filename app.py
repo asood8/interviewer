@@ -1,5 +1,6 @@
 import streamlit as st
 
+from interviewer.llm import has_credentials
 from interviewer.ui import working_profile
 
 st.set_page_config(page_title="Interviewer", page_icon="🎤")
@@ -9,6 +10,13 @@ st.write(
     "Mock interviews built around your own resume and projects. "
     "Claude asks the questions, you answer out loud, and you get feedback on what to fix and what to study."
 )
+
+if not has_credentials():
+    st.warning(
+        "No Anthropic API key found. Copy `.env.example` to `.env` and put your key in it, then restart. "
+        "Keys come from [console.anthropic.com](https://console.anthropic.com) and are billed pay-as-you-go, "
+        "separately from a Claude Pro or Max subscription."
+    )
 
 profile = working_profile()
 if profile.is_empty():

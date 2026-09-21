@@ -1,0 +1,3 @@
+# Keep line endings sane across platforms: shell scripts must stay LF, .bat must stay CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
