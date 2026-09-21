@@ -1,24 +1,32 @@
 # Interviewer
 
-A mock interviewer that only asks about your own resume and projects. You answer out loud, it tells you what
-was weak. Built for the gap between having good projects and being able to explain them: the questions get
-more specific than "what does it do", which is usually where answers fall apart.
+Interview practice built on your own material. It runs a full interview — resume walkthrough, behavioral
+questions, motivation, curveballs, technical questions about your projects, and your questions for them —
+grades each answer, and presses on anything you leave open.
 
 It runs on your machine and talks to the Claude API. Nothing is hosted.
 
 ![An answer with its feedback](docs/screenshots/interview.png)
 
-## What it actually does
+## What it covers
 
-You give it your resume and a page of notes per project. It asks the kind of question an interviewer would
-ask about *that* project, you answer out loud, and it grades the answer: six scores, what worked, what to
-fix, anything you got technically wrong, and a rewritten version of your answer in your own words with
-`[placeholder]` wherever a fact is missing. Then it usually follows up on whatever was vague, which is where
-real interviews find the gaps.
+Fourteen question types, drawn from your resume, background and projects:
 
-Spoken answers get a second kind of feedback the model isn't involved in: speaking pace, how many times you
-said "um", and where you paused for more than three seconds. The pauses are the interesting part, since they
-tend to land exactly where the prepared material ran out.
+- **Resume and story**: tell me about yourself, walk me through your resume
+- **Behavioral**: conflict, failure, leadership, tight deadlines, learning something fast, in STAR shape
+- **Motivation and curveballs**: why this role, weaknesses, what's not on the resume
+- **Your questions for them**: practice the end of the interview, not just the middle
+- **Projects, in depth**: the 30-second pitch, drill-downs into one component, why you chose X over Y, the
+  hardest bug, what breaks at 100x scale, explaining it to a non-engineer, concept checks on the tech you
+  listed, what you personally built, and what you'd do differently
+
+Every answer is scored on structure, clarity, technical depth, specificity, ownership and conciseness, with
+what worked, what to tighten, any technical errors, and a stronger version written in your own words with
+`[placeholder]` wherever a fact is missing. Follow-up questions build on what you just said, so a thin answer
+gets probed the way it would be in the room.
+
+Spoken answers also get delivery feedback the model isn't involved in: speaking pace, filler words, and any
+pause over three seconds, with the words you said right before it.
 
 ## Setup
 
@@ -45,28 +53,28 @@ streamlit run app.py            # then open http://localhost:8501
 
 ## How you use it
 
-**Start with the profile.** Upload a resume as a PDF or paste the text in, then add the projects. There's a
-button that reads the resume and pulls out the projects it finds, which saves some typing. A project can also
-point at its GitHub repo or a folder on disk, and the app reads the README and main source files so questions
-can get into the actual code.
+**Profile.** Upload a resume as a PDF or paste the text, then add your projects and background. One button
+reads the resume and pulls out the projects it finds. A project can also point at its GitHub repo or a folder
+on disk, and the app reads the README and main source files, so technical questions land on the code you
+actually wrote rather than on the buzzwords in your stack.
 
-**Then do the project prep.** It asks about ten questions on one project, nothing graded, and writes up the
-answers: the problem, how it's built, the decisions made and the ones rejected, the hardest bug, the numbers,
-what you'd change. Every question after that is grounded in these notes. The writeup is also the thing worth
-rereading before an interview, since most stumbling comes from never having said any of it out loud in order.
+**Project prep.** Ten quick questions per project, nothing graded, which produce a written brief: the problem,
+the architecture, the decisions and the alternatives, the hardest bug, the numbers, what you'd change, and the
+concepts an interviewer could reasonably ask you to explain. Later questions are grounded in this brief, and
+it doubles as the thing to reread before the real interview.
 
 ![The written-up project notes](docs/screenshots/project-prep.png)
 
-**Then interview.** Six modes: free practice, a three-question drill, a deep dive on one project, a full mock
+**Interview.** Six modes: free practice, a three-question drill, a deep dive on one project, a full mock
 interview (feedback held until the end, like the real thing), a drill aimed at a job posting you paste in, and
-a weak-spot session that re-asks the questions you did worst on. The interviewer can be friendly, neutral or
-skeptical. Skeptical pushes back on anything unsupported, which is uncomfortable and more useful.
+a weak-spot session that re-asks whatever scored lowest. The interviewer can be friendly, neutral or
+skeptical; skeptical pushes back on unsupported claims and is the better rehearsal.
 
-**Review and history.** Everything Claude says to study piles up in one list, and topics that keep coming back
-sort to the top. The worst-scoring questions are listed separately for another attempt, and when you redo one
-it shows the old score next to the new one. There's also a cram sheet for the ten minutes before a real
-interview: which project to lead with, which story to use where, what to brush up on, and which habits to
-watch for.
+**Review and history.** Study topics accumulate in one list, with repeats sorted to the top. Low-scoring
+questions queue up for another attempt, and when you redo one it shows the old score beside the new one.
+Answers worth keeping go in an answer bank, and the cram sheet pulls it together for the ten minutes before an
+interview: which project to lead with, which story fits which question, what to brush up on, and what to ask
+them.
 
 ![Weak spots](docs/screenshots/review-weak.png)
 ![Session history and trends](docs/screenshots/history.png)
